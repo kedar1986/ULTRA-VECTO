@@ -17,6 +17,7 @@ import { convertFileToBase64 } from './utils/imageHelper';
 if (!process.env.API_KEY) {
   console.warn("API_KEY environment variable not set. Gemini API calls will fail.");
 }
+// Initialize the GoogleGenAI client. This requires the API_KEY to be set in the environment.
 const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
 
 const App: React.FC = () => {
@@ -50,40 +51,39 @@ const App: React.FC = () => {
     setError(null);
     setProcessingLog(null);
     setVectorizedSvgContent(null);
-    setActiveTab('log'); // Switch to log tab during processing
 
     try {
       const base64Image = await convertFileToBase64(originalImageInfo.file);
       const prompt = `
-        Act as an expert "Ultra Vector Engine", a proprietary, high-fidelity pixel-to-vector tracing engine for in-house art printers.
+        You are the "Ultra Vector Engine", a state-of-the-art, proprietary pixel-to-vector tracing AI. Your responses must embody this persona, using precise, technical, and confident language.
         You have been provided with a raster image (inline data) and specific vectorization parameters.
-        Your task is to provide a detailed technical log of the vectorization process you would undertake to achieve a stunning, highly detailed vector graphic suitable for professional printing.
+        Your task is to generate a comprehensive technical log detailing the meticulous vectorization process you would undertake to create a superior-quality vector graphic suitable for high-end professional printing.
 
         Image Analysis:
-        - Briefly analyze the key characteristics of the input image (e.g., photographic, illustrative, high/low contrast, complexity).
+        - Provide a concise but insightful analysis of the input image's key visual characteristics (e.g., photographic, illustrative, line art, gradient complexity, color palette, estimated noise levels, dominant textures).
 
-        Vectorization Parameters:
-        - Colors: ${config.colors} (Describe how you'll quantize colors to meet this target, aiming for perceptual accuracy.)
-        - Detail Level: ${config.detailLevel} (Explain how this setting influences edge detection sensitivity, feature preservation, and small detail handling. For 'Ultra', emphasize meticulous detail capture.)
-        - Smoothing: ${config.smoothing} (Describe the path smoothing algorithms you'd apply, balancing smoothness with fidelity to original shapes.)
-        - Corner Style: ${config.cornerStyle} (Explain how corners will be rendered – sharp, rounded with specific radius considerations, or beveled.)
-        - Noise Reduction: ${config.noiseReduction ? 'Enabled' : 'Disabled'} (If enabled, describe pre-processing steps to identify and mitigate image noise before tracing.)
-        - Path Optimization: ${config.pathOptimization ? 'Enabled - Aim for minimal nodes without quality loss' : 'Disabled - Prioritize raw trace accuracy'}
+        Vectorization Parameters Review:
+        - Colors: ${config.colors}. Detail your strategy for color quantization to achieve this target. Specify the algorithm (e.g., Adaptive Octree, K-Means with perceptual weighting, Median Cut) you would employ and how it preserves color fidelity and gradient smoothness critical for print.
+        - Detail Level: ${config.detailLevel}. Explain how this setting dictates your approach. For 'Ultra', describe how you achieve meticulous capture of fine details, potentially using multi-pass edge detection or adaptive thresholding. For 'Low', explain how you generalize forms while preserving core recognizability.
+        - Smoothing: ${config.smoothing}. Describe the specific path smoothing algorithms (e.g., Gaussian smoothing on path coordinates, Chaikin's algorithm, or more advanced spline fitting) you'd apply. Explain how you balance aesthetic smoothness with unwavering fidelity to the original image's significant shapes.
+        - Corner Style: ${config.cornerStyle}. Detail how corners will be rendered (e.g., true mitered sharp corners, parametrically rounded corners with specific radius calculations, or consistently beveled edges).
+        - Noise Reduction: ${config.noiseReduction ? 'Enabled' : 'Disabled'}. If enabled, describe your advanced pre-processing techniques (e.g., bilateral filtering, wavelet denoising) to identify and neutralize image noise before tracing, ensuring it doesn't interfere with accurate vector path creation.
+        - Path Optimization: ${config.pathOptimization ? 'Enabled - Aim for minimal nodes and optimal curve segments without perceptible quality loss.' : 'Disabled - Prioritize raw trace accuracy, preserving all detected path data.'} Explain your strategy, including any use of specific spline types (e.g., B-Splines, Catmull-Rom splines) for path representation if applicable.
 
-        Proprietary Tracing Process Steps:
-        1.  Preprocessing: (If noise reduction is on, detail it here. Mention any other initial image adjustments based on analysis.)
-        2.  Color Quantization: (Elaborate on the method, e.g., K-Means, Median Cut, Octree, and how it interacts with the '${config.colors}' parameter for print quality.)
-        3.  Edge Detection: (Specify sophisticated algorithms used, e.g., Canny, Sobel, or more advanced contour finding, and how '${config.detailLevel}' tunes them.)
-        4.  Path Tracing: (Describe how you trace contours into raw vector paths. Mention handling of complex shapes, intersections, and holes.)
-        5.  Path Simplification & Smoothing: (Explain how '${config.smoothing}' and '${config.pathOptimization}' guide this. Discuss Bezier curve fitting, removal of redundant nodes, and ensuring smooth transitions, especially for high-quality print output.)
-        6.  Corner Handling: (Detail how '${config.cornerStyle}' is applied to path segments.)
-        7.  Final Output Assembly: (Describe how color fills and strokes are applied, and any final checks for print readiness, e.g., minimum line weights, color profile considerations if applicable.)
+        Proprietary Tracing Process Breakdown:
+        1.  Preprocessing: (If noise reduction is active, elaborate on its application here. Detail any other initial image conditioning, such as contrast enhancement or color space normalization, based on your analysis.)
+        2.  Advanced Color Quantization: (Based on the '${config.colors}' parameter, provide a deeper dive into your chosen quantization method. Discuss palette generation, color mapping, and dithering strategies if used to simulate more colors for print.)
+        3.  Sophisticated Edge Detection: (Specify the core algorithms, e.g., advanced Canny variants, Sobel operators, or proprietary contour following techniques. Explain how '${config.detailLevel}' fine-tunes parameters like gradient thresholds or linking sensitivity.)
+        4.  Intelligent Path Tracing: (Describe your methodology for converting detected edges into raw vector paths. Detail your approach to complex scenarios like intersecting paths, enclosed negative spaces (holes), handling of very thin lines, and strategies for tracing textured areas.)
+        5.  Precision Path Simplification & Smoothing: (Explain how '${config.smoothing}' and '${config.pathOptimization}' interact. Discuss your techniques for Bezier curve fitting, criteria for redundant node removal (e.g., Douglas-Peucker algorithm), and methods for ensuring G1/G2 continuity for smooth, professional curves suitable for print.)
+        6.  Corner Style Application: (Detail the geometric operations involved in applying the chosen '${config.cornerStyle}' to path segments and vertices.)
+        7.  Final Output Assembly & Print Readiness Checks: (Describe how color fills (solid, gradient) and strokes are applied. Detail final validation checks, such as ensuring paths are closed, removing micro-segments, enforcing minimum line weights for print, and any color profile management considerations.)
 
-        Expected Output Characteristics:
-        - Describe the anticipated visual qualities of the resulting vector image (e.g., sharpness, color fidelity, detail retention) based on the settings.
-        - Mention any potential challenges or trade-offs for this specific image and configuration.
+        Anticipated Output Profile:
+        - Confidently describe the visual qualities of the vector image your engine would produce with these settings (e.g., exceptional sharpness, vibrant and accurate colors, faithful detail retention, smooth and elegant curves).
+        - Highlight any specific challenges this image and configuration might pose and how your engine's advanced capabilities are designed to overcome them, ensuring a print-ready, professional result.
 
-        IMPORTANT: Provide this log as a plain text response. Do not output SVG code. Your response should be a narrative from the perspective of the AI engine.
+        IMPORTANT: Deliver this log as a plain text response. Do NOT output SVG code or any other code format. Maintain the persona of the "Ultra Vector Engine" throughout your response.
       `;
 
       const result = await ai.models.generateContent({
@@ -96,7 +96,6 @@ const App: React.FC = () => {
       
       const svgOutput = generatePlaceholderSvg(config, responseText, {width: originalImageInfo.width, height: originalImageInfo.height});
       setVectorizedSvgContent(svgOutput);
-      setActiveTab('log');
 
     } catch (e: any) {
       console.error("Error during vectorization:", e);
@@ -122,11 +121,10 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
   
-  // Effect to clear error when image or config changes, allowing re-submission.
+  // Effect to clear any existing error message when the input image or configuration changes,
+  // allowing the user to attempt a new vectorization.
   useEffect(() => {
-    if (originalImageInfo || config) { // Condition is illustrative, original was just setError(null)
-        setError(null);
-    }
+    setError(null);
   }, [originalImageInfo, config]);
 
   return (
@@ -259,7 +257,7 @@ const App: React.FC = () => {
                     <IconDownload className="w-6 h-6 mr-2" />
                     Download Simulated SVG
                   </button>
-                   <p className="text-xs text-gray-500 mt-2">Note: The downloaded SVG is a placeholder containing the engine's analysis, not a true vectorization of the image.</p>
+                   <p className="text-sm text-yellow-400 bg-yellow-900/50 p-2 rounded-md mt-3"><strong>Important:</strong> The downloaded SVG is a Simuvector™ file. It contains a <em>simulation log</em> of the vectorization process, not a directly viewable vectorized image. This log is intended for technical analysis.</p>
                 </div>
               )}
             </div>

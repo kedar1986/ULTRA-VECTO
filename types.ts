@@ -1,31 +1,27 @@
 
-export enum DetailLevel {
-  Low = "Low",
-  Medium = "Medium",
-  High = "High",
-  Ultra = "Ultra"
-}
-
-export enum SmoothingLevel {
-  None = "None",
-  Light = "Light",
-  Medium = "Medium",
-  Strong = "Strong"
-}
-
-export enum CornerStyle {
-  Sharp = "Sharp",
-  Rounded = "Rounded",
-  Beveled = "Beveled"
-}
-
-export interface VectorizationConfig {
-  colors: number;
-  detailLevel: DetailLevel;
-  smoothing: SmoothingLevel;
-  cornerStyle: CornerStyle;
-  noiseReduction: boolean;
-  pathOptimization: boolean;
+export interface ImageTracerConfig {
+  // Tracing
+  ltres?: number;
+  qtres?: number;
+  pathomit?: number;
+  colorsampling?: number;
+  numberofcolors?: number;
+  mincolorratio?: number;
+  colorquantcycles?: number;
+  // Layering
+  layering?: number;
+  // SVG rendering
+  strokewidth?: number;
+  linefilter?: boolean;
+  scale?: number;
+  roundcoords?: number;
+  viewbox?: boolean;
+  desc?: boolean;
+  lcpr?: number;
+  qcpr?: number;
+  // Blur
+  blurradius?: number;
+  blurdelta?: number;
 }
 
 export interface OriginalImageInfo {

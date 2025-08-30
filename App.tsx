@@ -1,116 +1,64 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { GoogleGenAI } from "@google/genai";
-import { OriginalImageInfo, VectorizationConfig, DetailLevel, SmoothingLevel, CornerStyle } from './types';
-import { APP_TITLE, DEFAULT_VECTORIZATION_CONFIG, GEMINI_MODEL_NAME, IconPhoto, IconCog, IconSparkles, IconDownload } from './constants';
+import { OriginalImageInfo, ImageTracerConfig } from './types'; // Updated
+import { APP_TITLE, DEFAULT_IMAGETRACER_CONFIG, IconPhoto, IconCog, IconSparkles, IconDownload } from './constants'; // Updated
 import ImageUploader from './components/ImageUploader';
-import ConfigurationPanel from './components/ConfigurationPanel';
-import ProcessingResultDisplay from './components/ProcessingResultDisplay';
+import ConfigurationPanel from './components/ConfigurationPanel'; // Path should be correct
 import LoadingSpinner from './components/LoadingSpinner';
-import { generatePlaceholderSvg } from './utils/svgHelper';
-import { convertFileToBase64 } from './utils/imageHelper';
-
-// Ensure API_KEY is set in the environment, otherwise Gemini service won't work.
-// In a real build, this would be set by the build environment.
-// For local dev, you might use a .env file and a build tool like Vite/Webpack.
-// For this exercise, we assume process.env.API_KEY is available.
-if (!process.env.API_KEY) {
-  console.warn("API_KEY environment variable not set. Gemini API calls will fail.");
-}
-const ai = process.env.API_KEY ? new GoogleGenAI({ apiKey: process.env.API_KEY }) : null;
+import { traceImageToSvg, TraceOptions } from './utils/vectorizer';
 
 const App: React.FC = () => {
   const [originalImageInfo, setOriginalImageInfo] = useState<OriginalImageInfo | null>(null);
-  const [config, setConfig] = useState<VectorizationConfig>(DEFAULT_VECTORIZATION_CONFIG);
+  const [config, setConfig] = useState<ImageTracerConfig>(DEFAULT_IMAGETRACER_CONFIG); // Updated
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
-  const [processingLog, setProcessingLog] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [vectorizedSvgContent, setVectorizedSvgContent] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'preview' | 'log'>('preview');
+  const [actualSvgOutput, setActualSvgOutput] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'preview' | 'vectorized'>('preview');
 
   const handleImageUpload = useCallback((imageInfo: OriginalImageInfo) => {
     setOriginalImageInfo(imageInfo);
-    setProcessingLog(null);
     setError(null);
-    setVectorizedSvgContent(null);
+    setActualSvgOutput(null);
     setActiveTab('preview');
   }, []);
 
-  const handleConfigChange = useCallback((newConfig: Partial<VectorizationConfig>) => {
+  const handleConfigChange = useCallback((newConfig: Partial<ImageTracerConfig>) => { // Updated
     setConfig(prevConfig => ({ ...prevConfig, ...newConfig }));
   }, []);
 
   const handleVectorize = useCallback(async () => {
-    if (!originalImageInfo || !ai) {
-      setError("Please upload an image and ensure API key is configured.");
+    if (!originalImageInfo) {
+      setError("Please upload an image.");
       return;
     }
 
     setIsProcessing(true);
     setError(null);
-    setProcessingLog(null);
-    setVectorizedSvgContent(null);
-    setActiveTab('log'); // Switch to log tab during processing
+    setActualSvgOutput(null);
 
     try {
-      const base64Image = await convertFileToBase64(originalImageInfo.file);
-      const prompt = `
-        Act as an expert "Ultra Vector Engine", a proprietary, high-fidelity pixel-to-vector tracing engine for in-house art printers.
-        You have been provided with a raster image (inline data) and specific vectorization parameters.
-        Your task is to provide a detailed technical log of the vectorization process you would undertake to achieve a stunning, highly detailed vector graphic suitable for professional printing.
-
-        Image Analysis:
-        - Briefly analyze the key characteristics of the input image (e.g., photographic, illustrative, high/low contrast, complexity).
-
-        Vectorization Parameters:
-        - Colors: ${config.colors} (Describe how you'll quantize colors to meet this target, aiming for perceptual accuracy.)
-        - Detail Level: ${config.detailLevel} (Explain how this setting influences edge detection sensitivity, feature preservation, and small detail handling. For 'Ultra', emphasize meticulous detail capture.)
-        - Smoothing: ${config.smoothing} (Describe the path smoothing algorithms you'd apply, balancing smoothness with fidelity to original shapes.)
-        - Corner Style: ${config.cornerStyle} (Explain how corners will be rendered – sharp, rounded with specific radius considerations, or beveled.)
-        - Noise Reduction: ${config.noiseReduction ? 'Enabled' : 'Disabled'} (If enabled, describe pre-processing steps to identify and mitigate image noise before tracing.)
-        - Path Optimization: ${config.pathOptimization ? 'Enabled - Aim for minimal nodes without quality loss' : 'Disabled - Prioritize raw trace accuracy'}
-
-        Proprietary Tracing Process Steps:
-        1.  Preprocessing: (If noise reduction is on, detail it here. Mention any other initial image adjustments based on analysis.)
-        2.  Color Quantization: (Elaborate on the method, e.g., K-Means, Median Cut, Octree, and how it interacts with the '${config.colors}' parameter for print quality.)
-        3.  Edge Detection: (Specify sophisticated algorithms used, e.g., Canny, Sobel, or more advanced contour finding, and how '${config.detailLevel}' tunes them.)
-        4.  Path Tracing: (Describe how you trace contours into raw vector paths. Mention handling of complex shapes, intersections, and holes.)
-        5.  Path Simplification & Smoothing: (Explain how '${config.smoothing}' and '${config.pathOptimization}' guide this. Discuss Bezier curve fitting, removal of redundant nodes, and ensuring smooth transitions, especially for high-quality print output.)
-        6.  Corner Handling: (Detail how '${config.cornerStyle}' is applied to path segments.)
-        7.  Final Output Assembly: (Describe how color fills and strokes are applied, and any final checks for print readiness, e.g., minimum line weights, color profile considerations if applicable.)
-
-        Expected Output Characteristics:
-        - Describe the anticipated visual qualities of the resulting vector image (e.g., sharpness, color fidelity, detail retention) based on the settings.
-        - Mention any potential challenges or trade-offs for this specific image and configuration.
-
-        IMPORTANT: Provide this log as a plain text response. Do not output SVG code. Your response should be a narrative from the perspective of the AI engine.
-      `;
-
-      const result = await ai.models.generateContent({
-        model: GEMINI_MODEL_NAME,
-        contents: [{ parts: [{ inlineData: { mimeType: originalImageInfo.file.type, data: base64Image.split(',')[1] } }, { text: prompt }] }],
-      });
-      
-      const responseText = result.text;
-      setProcessingLog(responseText);
-      
-      const svgOutput = generatePlaceholderSvg(config, responseText, {width: originalImageInfo.width, height: originalImageInfo.height});
-      setVectorizedSvgContent(svgOutput);
-      setActiveTab('log');
-
+      if (!originalImageInfo?.file) { // Ensure file exists
+        setError("No image file found.");
+        setIsProcessing(false);
+        return;
+      }
+      // Pass the config state to the vectorizer
+      const currentTraceOptions: TraceOptions = { ...config }; 
+      const svgString = await traceImageToSvg(originalImageInfo.file, currentTraceOptions);
+      setActualSvgOutput(svgString);
     } catch (e: any) {
-      console.error("Error during vectorization:", e);
-      setError(`Processing failed: ${e.message || 'Unknown error'}. Ensure your API key is valid and has Gemini API enabled.`);
-      setProcessingLog(null);
+      console.error("Error during client-side vectorization:", e);
+      setError(`Vectorization failed: ${e.message || 'Unknown error'}`);
+      setActualSvgOutput(null); // Clear any partial output
     } finally {
       setIsProcessing(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [originalImageInfo, config, ai]); // ai is included as it's used in the callback.
+  }, [originalImageInfo, config]);
 
   const handleDownloadSvg = () => {
-    if (!vectorizedSvgContent || !originalImageInfo) return;
-    const blob = new Blob([vectorizedSvgContent], { type: 'image/svg+xml' });
+    if (!actualSvgOutput || !originalImageInfo) return;
+    const blob = new Blob([actualSvgOutput], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -122,11 +70,10 @@ const App: React.FC = () => {
     URL.revokeObjectURL(url);
   };
   
-  // Effect to clear error when image or config changes, allowing re-submission.
+  // Effect to clear any existing error message when the input image or configuration changes,
+  // allowing the user to attempt a new vectorization.
   useEffect(() => {
-    if (originalImageInfo || config) { // Condition is illustrative, original was just setError(null)
-        setError(null);
-    }
+    setError(null);
   }, [originalImageInfo, config]);
 
   return (
@@ -176,7 +123,7 @@ const App: React.FC = () => {
                 <h2 className="text-xl font-semibold text-purple-300">Processing Output</h2>
                 <button
                   onClick={handleVectorize}
-                  disabled={isProcessing || !originalImageInfo || !ai}
+                  disabled={isProcessing || !originalImageInfo}
                   className="px-6 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 flex items-center"
                 >
                   {isProcessing ? (
@@ -199,7 +146,7 @@ const App: React.FC = () => {
               )}
 
               {/* Tab Navigation */}
-              {(isProcessing || processingLog || originalImageInfo?.previewUrl) && (
+              {(isProcessing || actualSvgOutput || originalImageInfo?.previewUrl) && (
                  <div className="mb-4 border-b border-gray-700">
                     <nav className="-mb-px flex space-x-4" aria-label="Tabs">
                       <button
@@ -213,14 +160,14 @@ const App: React.FC = () => {
                         Image Preview
                       </button>
                       <button
-                        onClick={() => setActiveTab('log')}
+                        onClick={() => setActiveTab('vectorized')}
                         className={`${
-                          activeTab === 'log'
+                          activeTab === 'vectorized'
                             ? 'border-purple-500 text-purple-400'
                             : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
                         } whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors`}
                       >
-                        Engine Log
+                        Vectorized Output
                       </button>
                     </nav>
                   </div>
@@ -237,29 +184,36 @@ const App: React.FC = () => {
                         <p className="mt-2 text-sm text-gray-400">Original Image Preview</p>
                     </div>
                 )}
-                {activeTab === 'log' && (isProcessing || processingLog) && (
-                  <ProcessingResultDisplay
-                    log={processingLog}
-                    isLoading={isProcessing}
-                  />
+                {/* SVG Output Display */}
+                {activeTab === 'vectorized' && isProcessing && (
+                  <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
+                    <LoadingSpinner className="w-12 h-12 mb-4" />
+                    <p>Processing image...</p>
+                  </div>
                 )}
-                 {activeTab === 'log' && !isProcessing && !processingLog && originalImageInfo && (
+                {activeTab === 'vectorized' && !isProcessing && actualSvgOutput && (
+                  <div className="w-full h-full flex flex-col items-center justify-center bg-gray-700/30 rounded-lg p-4">
+                    <div dangerouslySetInnerHTML={{ __html: actualSvgOutput }} className="max-w-full max-h-[400px] overflow-auto bg-white rounded shadow-lg" />
+                    <p className="mt-2 text-sm text-gray-400">Vectorized Output Preview</p>
+                  </div>
+                )}
+                 {activeTab === 'vectorized' && !isProcessing && !actualSvgOutput && originalImageInfo && (
                   <div className="flex-grow flex flex-col items-center justify-center text-center text-gray-500 p-4">
-                      <p className="text-lg">Click "Vectorize" to see the AI engine analysis.</p>
+                      <p className="text-lg">Click "Vectorize" to generate the SVG output.</p>
                   </div>
                 )}
               </div>
 
-              {vectorizedSvgContent && !isProcessing && (
+              {actualSvgOutput && !isProcessing && (
                 <div className="mt-6 text-center">
                   <button
                     onClick={handleDownloadSvg}
                     className="px-8 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-xl transition-colors duration-150 flex items-center justify-center mx-auto"
                   >
                     <IconDownload className="w-6 h-6 mr-2" />
-                    Download Simulated SVG
+                    Download SVG
                   </button>
-                   <p className="text-xs text-gray-500 mt-2">Note: The downloaded SVG is a placeholder containing the engine's analysis, not a true vectorization of the image.</p>
+                   <p className="text-sm text-gray-400 mt-2">Note: This is a preview of the vectorized SVG. Ensure processing is complete for the final version.</p>
                 </div>
               )}
             </div>
@@ -269,7 +223,7 @@ const App: React.FC = () => {
 
       <footer className="bg-gray-800 text-center p-4 text-sm text-gray-500 shadow-inner">
         <p>&copy; {new Date().getFullYear()} Ultra Vector Studio. AI-Powered Vectorization Simulation.</p>
-        <p>This tool uses a simulated engine. API key for Gemini must be configured in environment variables.</p>
+        <p>Client-side image processing using Potrace (integration in progress).</p>
       </footer>
     </div>
   );

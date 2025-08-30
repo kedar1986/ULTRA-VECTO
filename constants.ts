@@ -4,18 +4,35 @@
 // and the TypeScript environment may not be configured to process JSX in .ts files directly.
 // This change ensures compatibility without needing to rename the file to .tsx or alter tsconfig.json.
 import React from 'react';
-import { DetailLevel, SmoothingLevel, CornerStyle, VectorizationConfig } from './types';
+import { ImageTracerConfig } from './types'; // Updated import
 
 export const APP_TITLE = "Ultra Vector Studio";
-export const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17";
+// GEMINI_MODEL_NAME is no longer used, can be removed if not needed elsewhere.
+// export const GEMINI_MODEL_NAME = "gemini-2.5-flash-preview-04-17"; 
 
-export const DEFAULT_VECTORIZATION_CONFIG: VectorizationConfig = {
-  colors: 32,
-  detailLevel: DetailLevel.High,
-  smoothing: SmoothingLevel.Medium,
-  cornerStyle: CornerStyle.Rounded,
-  noiseReduction: true,
-  pathOptimization: true,
+export const DEFAULT_IMAGETRACER_CONFIG: ImageTracerConfig = {
+  // Tracing
+  ltres: 1,
+  qtres: 1,
+  pathomit: 8,
+  colorsampling: 1, // 0: disabled, 1: random sampling, 2: deterministic sampling
+  numberofcolors: 16,
+  mincolorratio: 0.02,
+  colorquantcycles: 3,
+  // Layering
+  layering: 0, // 0: sequential layering, 1: parallel layering
+  // SVG rendering
+  strokewidth: 1,
+  linefilter: false,
+  scale: 1,
+  roundcoords: 1,
+  viewbox: false,
+  desc: false,
+  lcpr: 0,
+  qcpr: 0,
+  // Blur
+  blurradius: 0,
+  blurdelta: 20,
 };
 
 export const COLOR_OPTIONS = [2, 4, 8, 16, 32, 64, 128, 256];
